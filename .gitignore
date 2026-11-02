@@ -1,0 +1,6 @@
+.env
+/ps5-messaging
+/dist
+*.log
+next-session.md
+NEXT-SESSION.md

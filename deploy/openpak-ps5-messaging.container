@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenPak PS5 groups and messages (ps5-messaging): m.np.playstation.com /api/gamingLoungeGroups/
+
+[Container]
+ContainerName=openpak-ps5-messaging
+Image=ghcr.io/openpak/ps5-messaging:latest
+AutoUpdate=registry
+Network=openpak.network
+# IP= is assigned when the unit is installed (run pin-ips.sh --apply on the box).
+# Traefik routes Host(m.np.playstation.com) && PathPrefix(/api/gamingLoungeGroups/) to :8080.
+Environment=PS5_ADDR=:8080
+EnvironmentFile=/etc/openpak/ps5.env
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

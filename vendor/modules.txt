@@ -1,0 +1,6 @@
+# github.com/openpak/ps5-common v0.0.0 => ../ps5-common
+## explicit; go 1.26.0
+github.com/openpak/ps5-common/config
+github.com/openpak/ps5-common/httpx
+github.com/openpak/ps5-common/oauth
+# github.com/openpak/ps5-common => ../ps5-common
