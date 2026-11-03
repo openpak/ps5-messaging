@@ -30,8 +30,10 @@ docker build -t ps5-messaging .
 | `PS5_ADDR` | no | `:8080` | HTTP listen address |
 | `PS5_TOKEN_KEY` | yes | | HMAC key of the bearer tokens, shared with ps5-auth |
 | `PS5_LOG_LEVEL` | no | `info` | `debug`, `info`, `warn`, `error` |
+| `PS5_DATABASE_URL` | yes | | Postgres URL (3-connection pool); the service exits without it unless `PS5_DEV_MEMORY=1`. Tables are created at start |
+| `PS5_DEV_MEMORY` | no | | `1`: keep state in memory, lost on restart (local development only) |
 
-Other `PS5_*` variables of ps5-common are accepted and ignored. Messages live in memory and are lost on restart.
+Other `PS5_*` variables of ps5-common are accepted and ignored. Groups, members and every message live in Postgres (`ps5_msg_groups`, `ps5_msg_members`, `ps5_msg_messages`), so one database backup covers them.
 
 ## Vendoring
 

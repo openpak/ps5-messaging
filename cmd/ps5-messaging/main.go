@@ -15,6 +15,7 @@ import (
 	"github.com/openpak/ps5-common/config"
 	"github.com/openpak/ps5-common/httpx"
 	"github.com/openpak/ps5-common/oauth"
+	"github.com/openpak/ps5-common/pgdb"
 	"openpak/ps5-messaging/internal/messaging"
 )
 
@@ -34,11 +35,27 @@ func main() {
 		log.Error("config", "err", err)
 		os.Exit(2)
 	}
-	// In-memory store; the OpenPak chat service is the intended backend.
-	h := httpx.Logger(log, messaging.Handler(messaging.NewMemory(), signer))
-	srv := &http.Server{Addr: cfg.Addr, Handler: h, ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	var store messaging.Store
+	if cfg.DatabaseURL == "" && config.DevMemory(os.Getenv) {
+		log.Warn("PS5_DEV_MEMORY=1: messages are kept in memory and lost on restart (development only)")
+		store = messaging.NewMemory()
+	} else {
+		pool, err := pgdb.Open(ctx, cfg.DatabaseURL, pgdb.DefaultMaxConns)
+		if err != nil {
+			log.Error("database", "err", err)
+			os.Exit(2)
+		}
+		defer pool.Close()
+		if store, err = messaging.NewPostgres(ctx, pool); err != nil {
+			log.Error("database schema", "err", err)
+			os.Exit(2)
+		}
+		log.Info("groups and messages stored in Postgres")
+	}
+	h := httpx.Logger(log, messaging.Handler(store, signer))
+	srv := &http.Server{Addr: cfg.Addr, Handler: h, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

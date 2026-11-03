@@ -55,3 +55,11 @@ func Load(getenv func(string) string) (*Config, error) {
 	}
 	return c, nil
 }
+
+// DevMemory reports whether PS5_DEV_MEMORY=1: the explicit local-development switch that allows
+// in-memory player and account state. Without it a service refuses to start without its database
+// (or account core).
+func DevMemory(getenv func(string) string) bool {
+	v := getenv("PS5_DEV_MEMORY")
+	return v == "1" || v == "true"
+}

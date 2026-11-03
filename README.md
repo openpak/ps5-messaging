@@ -24,8 +24,8 @@ All paths are on `m.np.playstation.com` under `/api/gamingLoungeGroups/v1`, behi
 
 Party voice is out of scope. Image messages, group editing and invitee/leave calls are not implemented yet.
 
-Storage is in memory behind the `Store` interface; the OpenPak universal social/chat service
-(`platforms/core/infra/chat`) is the intended backend.
+Storage is Postgres (`PS5_DATABASE_URL`) behind the `Store` interface: groups have any number of members, which the
+core chat service (one-to-one conversations) cannot hold. The service exits without a database unless `PS5_DEV_MEMORY=1`.
 
 ## Run
 
