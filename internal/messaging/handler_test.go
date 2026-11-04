@@ -98,3 +98,36 @@ func TestGroupFlow(t *testing.T) {
 		t.Fatalf("healthz: %d", c)
 	}
 }
+
+func TestMemoryErase(t *testing.T) {
+	m := NewMemory()
+	dm, _ := m.CreateGroup(Member{AccountID: "1"}, []Member{{AccountID: "2"}}, "")
+	m.Post(dm.GroupID, dm.MainThread.ThreadID, Member{AccountID: "2"}, 1, "hi")
+	grp, _ := m.CreateGroup(Member{AccountID: "1"}, []Member{{AccountID: "2"}, {AccountID: "3"}}, "g")
+	m.Post(grp.GroupID, grp.MainThread.ThreadID, Member{AccountID: "1"}, 1, "from 1")
+	m.Post(grp.GroupID, grp.MainThread.ThreadID, Member{AccountID: "2"}, 1, "from 2")
+	other, _ := m.CreateGroup(Member{AccountID: "2"}, []Member{{AccountID: "3"}}, "")
+	m.Post(other.GroupID, other.MainThread.ThreadID, Member{AccountID: "3"}, 1, "kept")
+
+	// dm: group + 2 members + 1 message = 4; grp: 1 member + 1 message = 2.
+	n, err := m.Erase([]string{"1"})
+	if err != nil || n != 6 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if len(m.GroupsOf("1")) != 0 {
+		t.Fatal("account still in a group")
+	}
+	if _, err := m.Group(dm.GroupID, "2"); err != ErrNotFound {
+		t.Fatalf("direct message survived: %v", err)
+	}
+	msgs, total, err := m.Messages(grp.GroupID, grp.MainThread.ThreadID, "2", 10)
+	if err != nil || total != 1 || msgs[0].Body != "from 2" {
+		t.Fatal(msgs, total, err)
+	}
+	if _, total, _ := m.Messages(other.GroupID, other.MainThread.ThreadID, "2", 10); total != 1 {
+		t.Fatal("unrelated group touched")
+	}
+	if n, err := m.Erase([]string{"1"}); err != nil || n != 0 {
+		t.Fatalf("second run n=%d err=%v", n, err)
+	}
+}

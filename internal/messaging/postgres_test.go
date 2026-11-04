@@ -82,3 +82,25 @@ func TestPostgresMessagesSurviveRestart(t *testing.T) {
 		t.Fatal("stranger sees groups")
 	}
 }
+
+func TestPostgresErase(t *testing.T) {
+	st, _ := openPG(t)
+	dm, _ := st.CreateGroup(Member{AccountID: "1"}, []Member{{AccountID: "2"}}, "")
+	st.Post(dm.GroupID, dm.MainThread.ThreadID, Member{AccountID: "2"}, 1, "hi")
+	grp, _ := st.CreateGroup(Member{AccountID: "1"}, []Member{{AccountID: "2"}, {AccountID: "3"}}, "g")
+	st.Post(grp.GroupID, grp.MainThread.ThreadID, Member{AccountID: "1"}, 1, "from 1")
+	st.Post(grp.GroupID, grp.MainThread.ThreadID, Member{AccountID: "2"}, 1, "from 2")
+	n, err := st.Erase([]string{"1"})
+	if err != nil || n != 6 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if len(st.GroupsOf("1")) != 0 || len(st.GroupsOf("2")) != 1 {
+		t.Fatal("wrong groups left")
+	}
+	if _, total, _ := st.Messages(grp.GroupID, grp.MainThread.ThreadID, "2", 10); total != 1 {
+		t.Fatalf("total %d", total)
+	}
+	if n, err := st.Erase([]string{"1"}); err != nil || n != 0 {
+		t.Fatalf("second run n=%d err=%v", n, err)
+	}
+}

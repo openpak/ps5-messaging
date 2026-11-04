@@ -57,6 +57,11 @@ type Store interface {
 	Group(groupID, accountID string) (Group, error)
 	Post(groupID, threadID string, sender Member, msgType int, body string) (Message, error)
 	Messages(groupID, threadID, accountID string, limit int) ([]Message, int, error) // newest first, total count
+	// Erase removes the accounts from every group. A direct message with any of them goes
+	// entirely (both sides, like the chat service); in a group chat their messages and
+	// memberships go and the others keep the rest; a group left empty goes. Idempotent;
+	// reports the rows removed (groups, members, messages).
+	Erase(ids []string) (int, error)
 }
 
 // Memory is an in-memory Store.
@@ -190,4 +195,50 @@ func (m *Memory) Messages(groupID, threadID, accountID string, limit int) ([]Mes
 		out = append(out, all[i])
 	}
 	return out, len(all), nil
+}
+
+// Erase implements Store.
+func (m *Memory) Erase(ids []string) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	set := map[string]bool{}
+	for _, id := range ids {
+		set[id] = true
+	}
+	n := 0
+	for gid, g := range m.groups {
+		in := 0
+		for _, mb := range g.Members {
+			if set[mb.AccountID] {
+				in++
+			}
+		}
+		if in == 0 {
+			continue
+		}
+		keep := g.Members[:0:0]
+		for _, mb := range g.Members {
+			if !set[mb.AccountID] {
+				keep = append(keep, mb)
+			}
+		}
+		if g.GroupType == 0 || len(keep) == 0 {
+			n += len(g.Members) + 1 + len(m.msgs[gid]) // every member row, the group and its whole history
+			delete(m.groups, gid)
+			delete(m.msgs, gid)
+			continue
+		}
+		n += in
+		g.Members = keep
+		kept := m.msgs[gid][:0:0]
+		for _, msg := range m.msgs[gid] {
+			if set[msg.Sender.AccountID] {
+				n++
+			} else {
+				kept = append(kept, msg)
+			}
+		}
+		m.msgs[gid] = kept
+	}
+	return n, nil
 }

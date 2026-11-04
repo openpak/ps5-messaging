@@ -1,5 +1,12 @@
 # Changelog: ps5-messaging
 
+## v0.2.0 (2026-11-04)
+
+- Account erasure (card #120): `DELETE /internal/accounts/{account_id}/data` (bearer `ACCOUNT_ERASE_KEY`, listener `ERASE_ADDR`,
+  default `:9099`). Direct messages with the account go whole (both sides, like the chat service); in group chats its messages
+  and membership go and the others keep the rest; a group left without members goes. One transaction; one `account erased`
+  log line; idempotent. Uses ps5-common `erase` and the account core client to find the `ps5` link subject.
+
 ## v0.1.0 (2026-11-03)
 
 - 2026-11-03: groups, members and message history are durable in Postgres (`messaging.Postgres`, tables `ps5_msg_*`). The service

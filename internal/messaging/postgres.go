@@ -304,3 +304,44 @@ func (p *Postgres) Messages(groupID, threadID, accountID string, limit int) ([]M
 	}
 	return out, total, rows.Err()
 }
+
+// Erase implements Store in one transaction. Direct messages with the accounts and groups left
+// without members are deleted whole; elsewhere the accounts' messages and memberships go.
+func (p *Postgres) Erase(ids []string) (int, error) {
+	ctx, cancel := ctx5()
+	defer cancel()
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `SELECT g.seq FROM ps5_msg_groups g
+		WHERE g.seq IN (SELECT group_seq FROM ps5_msg_members WHERE account_id = ANY($1))
+		AND (g.kind = 0 OR NOT EXISTS (SELECT 1 FROM ps5_msg_members m WHERE m.group_seq = g.seq AND NOT m.account_id = ANY($1)))`, ids)
+	if err != nil {
+		return 0, err
+	}
+	doomed, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return 0, err
+	}
+	if doomed == nil {
+		doomed = []int64{}
+	}
+	n := 0
+	for _, q := range []struct {
+		sql  string
+		args []any
+	}{
+		{`DELETE FROM ps5_msg_messages WHERE group_seq = ANY($2) OR sender_id = ANY($1)`, []any{ids, doomed}},
+		{`DELETE FROM ps5_msg_members WHERE group_seq = ANY($2) OR account_id = ANY($1)`, []any{ids, doomed}},
+		{`DELETE FROM ps5_msg_groups WHERE seq = ANY($1)`, []any{doomed}},
+	} {
+		tag, err := tx.Exec(ctx, q.sql, q.args...)
+		if err != nil {
+			return 0, err
+		}
+		n += int(tag.RowsAffected())
+	}
+	return n, tx.Commit(ctx)
+}

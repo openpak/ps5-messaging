@@ -43,3 +43,15 @@ ps5-common: `GOWORK=off go mod vendor`.
 ## Release
 
 Tag `v*.*.*` publishes `ghcr.io/openpak/ps5-messaging`; deployed hosts auto-update from it.
+
+## Account erasure
+
+`DELETE /internal/accounts/{account_id}/data` with `Authorization: Bearer <ACCOUNT_ERASE_KEY>` erases everything this service
+holds for a core account (UUID). It listens on `ERASE_ADDR` (default `:9099`, container network only, never published) and is
+only served when `ACCOUNT_ERASE_KEY` is set. The website finaliser calls `http://openpak-ps5-messaging:9099`; the reply is
+`{"service":"ps5-messaging","rows":N}`. The ids searched are the core account id and, when the core (`PS5_ACCOUNT_CORE_URL`) has an
+active `ps5` link for it, the link subject. If the core is configured but unreachable the call fails (500) rather than
+skipping data.
+
+Erased: memberships, messages the account sent, direct-message groups it was in (with all their messages), and groups left empty.
+Kept: messages other members sent in group chats (they are not the erased account's data).

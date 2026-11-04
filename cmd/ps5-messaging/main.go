@@ -12,7 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/openpak/ps5-common/accountcore"
 	"github.com/openpak/ps5-common/config"
+	"github.com/openpak/ps5-common/erase"
 	"github.com/openpak/ps5-common/httpx"
 	"github.com/openpak/ps5-common/oauth"
 	"github.com/openpak/ps5-common/pgdb"
@@ -54,6 +56,18 @@ func main() {
 		}
 		log.Info("groups and messages stored in Postgres")
 	}
+	var core accountcore.Core
+	if cfg.CoreURL != "" {
+		c, err := accountcore.New(cfg.CoreURL, cfg.CoreToken, nil)
+		if err != nil {
+			log.Error("account core", "err", err)
+			os.Exit(2)
+		}
+		core = c
+	}
+	eraseKey := os.Getenv("ACCOUNT_ERASE_KEY")
+	go erase.Serve(ctx, os.Getenv("ERASE_ADDR"), eraseKey, erase.Handler("ps5-messaging", eraseKey, core,
+		func(_ context.Context, ids []string) (int, error) { return store.Erase(ids) }, log), log)
 	h := httpx.Logger(log, messaging.Handler(store, signer))
 	srv := &http.Server{Addr: cfg.Addr, Handler: h, ReadHeaderTimeout: 10 * time.Second}
 	go func() {
